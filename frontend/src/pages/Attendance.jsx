@@ -39,18 +39,33 @@ const Attendance = () => {
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const fetchData = async (searchVal = debouncedSearch) => {
     setLoading(true);
     try {
+      const historyParams = { role };
+      if (role === 'Employee') {
+        historyParams.emp_id = user.user_id;
+      }
+      if (searchVal) {
+        historyParams.search = searchVal;
+      }
+
       const [historyRes, statsRes] = await Promise.all([
-        attendanceApi.getHistory({ emp_id: user.user_id }),
-        analyticsApi.getStats({ role })
+        attendanceApi.getHistory(historyParams),
+        analyticsApi.getStats({ role, emp_id: user.user_id })
       ]);
 
       if (historyRes.success) setHistory(historyRes.data);
@@ -69,7 +84,7 @@ const Attendance = () => {
 
   useEffect(() => {
     fetchData();
-  }, [user, role]);
+  }, [user, role, debouncedSearch]);
 
   const handleAttendance = async (action) => {
     setMarking(true);
@@ -219,7 +234,13 @@ const Attendance = () => {
              {role !== 'Employee' && (
                  <div className="glass" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '12px' }}>
                     <Search size={16} color="#666" />
-                    <input type="text" placeholder="Search employee..." style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.875rem', outline: 'none' }} />
+                    <input 
+                        type="text" 
+                        placeholder="Search name or ID..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.875rem', outline: 'none' }} 
+                    />
                  </div>
              )}
           </header>
@@ -228,6 +249,7 @@ const Attendance = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--glass-border)', fontSize: '0.875rem' }}>
+                  {role !== 'Employee' && <th style={{ padding: '1rem' }}>Employee</th>}
                   <th style={{ padding: '1rem' }}>Date</th>
                   <th style={{ padding: '1rem' }}>Check In</th>
                   <th style={{ padding: '1rem' }}>Check Out</th>
@@ -238,10 +260,22 @@ const Attendance = () => {
               <tbody>
                 {history.map((record, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.925rem' }}>
+                    {role !== 'Employee' && (
+                        <td style={{ padding: '1rem' }}>
+                            <div style={{ fontWeight: 600 }}>{record.name}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ID: {record.emp_id}</div>
+                        </td>
+                    )}
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{record.date}</td>
                     <td style={{ padding: '1rem' }}>{record.check_in_time}</td>
                     <td style={{ padding: '1rem' }}>{record.check_out_time || '--:--'}</td>
-                    <td style={{ padding: '1rem' }}>{record.duration ? `${record.duration}h` : '--'}</td>
+                    <td style={{ padding: '1rem' }}>
+                        {record.check_out_time ? (
+                            <span style={{ fontWeight: 600 }}>{record.duration}h</span>
+                        ) : (
+                            <span style={{ color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: 600 }}>In Progress</span>
+                        )}
+                    </td>
                     <td style={{ padding: '1rem' }}>
                       <span style={{ 
                         padding: '4px 12px', 

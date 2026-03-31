@@ -129,6 +129,7 @@ export const attendanceApi = {
   },
   getHistory: async (params = {}) => {
     try {
+      // Ensure we always pass the current role for access control
       const { data } = await api.get('/getAttendance.php', { params });
       return data;
     } catch (error) {
